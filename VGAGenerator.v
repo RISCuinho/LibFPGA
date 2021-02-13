@@ -2,15 +2,16 @@
 module VGAGenerator
 #(
    parameter DEEP_COLOR = 1,
-   // resoluÃ§Ã£o X * Y tamanho da memÃ³ria de exibiÃ§Ã£o
+   // resolução X * Y * 32bits tamanho da memória de exibição
    parameter RES_X = 640,
    parameter RES_Y = 480
 )
 (
   input clk, // tem que ser 25.175 (25mhz aproximadamente)
   input [31:0] pixel, // pixel a ser exibido naquele clock
-                      // a cada clock pula para o prÃ³ximo pixel exibivel
+                      // a cada clock pula para o próximo pixel exibivel
                       // [31-24] ignorado, [23-16]Red, [15-8]Green, [7-0]Blue
+                      // para saber qual pixel a ser obtido usar COL, LINE e inDisplayArea
   output reg [DEEP_COLOR - 1: 0]R, 
   output reg [DEEP_COLOR - 1: 0]G, 
   output reg [DEEP_COLOR - 1: 0]B, 
@@ -27,12 +28,15 @@ assign local_col = COL;
 assign local_line = LINE;
 assign local_InDisplayArea = inDisplayArea;
 
+// Gera os sinais de sincronismo
 VGASync #(.RES_X(RES_X), .RES_Y(RES_Y)) sync(.clk(clk), .COL(local_col), .LINE(local_line), .VS(VS), .HS(HS), .inDisplayArea(local_inDisplayArea));
 
+// mapea o byte a sua respectiva cor, confrome a profundida de cores (DEEP_COLOR)
 always @(posedge clk)
 begin
 	if(VS && HS)
 	begin
+    // ainda a ser implementado
 		R <= pixel[7:0];
 		G <= pixel[15:8];
 		B <= pixel[23:16];
@@ -128,7 +132,7 @@ module VGASync
   );
 
 wire MAX_COL = (COL == 767); // tentando entender porque 767 (9'h2FF) 
-                              // nÃ£o deveria ser 799 (800)
+                              // não deveria ser 799 (800)
 reg local_HS, local_VS;
 
 always @(posedge clk)
@@ -151,6 +155,7 @@ begin: SYNC
   local_VS <= (LINE == 500);    // active for 768 clocks - 500
 end
 
+// padrão industrial do VGA usa sincronismo inverso
 assign HS = ~local_HS;
 assign VS = ~local_VS;
 
