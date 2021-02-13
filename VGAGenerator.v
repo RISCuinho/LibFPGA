@@ -2,42 +2,34 @@
 module VGAGenerator
 #(
    parameter DEEP_COLOR = 1,
-   // resolução X * Y * 32bits tamanho da memória de exibição
+   // resoluÃƒÂ§ÃƒÂ£o X * Y * 32bits tamanho da memÃƒÂ³ria de exibiÃƒÂ§ÃƒÂ£o
    parameter RES_X = 640,
    parameter RES_Y = 480
 )
 (
   input clk, // tem que ser 25.175 (25mhz aproximadamente)
   input [31:0] pixel, // pixel a ser exibido naquele clock
-                      // a cada clock pula para o próximo pixel exibivel
+                      // a cada clock pula para o prÃƒÂ³ximo pixel exibivel
                       // [31-24] ignorado, [23-16]Red, [15-8]Green, [7-0]Blue
                       // para saber qual pixel a ser obtido usar COL, LINE e inDisplayArea
   output reg [DEEP_COLOR - 1: 0]R = {DEEP_COLOR{1'b0}}, 
   output reg [DEEP_COLOR - 1: 0]G = {DEEP_COLOR{1'b0}}, 
   output reg [DEEP_COLOR - 1: 0]B = {DEEP_COLOR{1'b0}}, 
   output VS, output HS,
-  output reg [9:0]COL = 10'b0, output  reg [8:0]LINE = 9'b0,
- 	output reg inDisplayArea = 1'b0
+  output [9:0]COL, output [8:0]LINE,
+  output inDisplayArea
 );
 
-wire [9:0]local_col;
-wire [8:0]local_line;
-wire local_inDisplayArea;
-wire local_HS, local_VS;
-
-assign local_col = COL;
-assign local_line = LINE;
-assign local_inDisplayArea = inDisplayArea;
-assign local_HS = HS;
-assign local_VS = VS;
-
 // Gera os sinais de sincronismo
-VGASync #(.RES_X(RES_X), .RES_Y(RES_Y)) sync(.clk(clk), .COL(local_col), .LINE(local_line), .VS(local_VS), .HS(local_HS), .inDisplayArea(local_inDisplayArea));
+VGASync #(.RES_X(RES_X), .RES_Y(RES_Y)) sync(.clk(clk), 
+													.COL(COL), .LINE(LINE), 
+													.VS(VS), .HS(HS), 
+													.inDisplayArea(inDisplayArea));
 
 // mapea o byte a sua respectiva cor, confrome a profundida de cores (DEEP_COLOR)
 always @(posedge clk)
-begin
-	if(local_VS && local_HS && local_inDisplayArea)
+begin: RGB_GENERATOR
+	if(inDisplayArea)
 	begin
     // ainda a ser implementado
 		R <= pixel[7:0];
@@ -133,7 +125,7 @@ module VGASync
   );
 
 localparam SIZE_HS = 96;
-localparam LIMIT_MAX_COL =  (RES_X + 8 + SIZE_HS + 8 + 40  + 8) -1; // -1 porque a contagem começa de zero
+localparam LIMIT_MAX_COL =  (RES_X + 8 + SIZE_HS + 8 + 40  + 8) -1; // -1 porque a contagem comeÃƒÂ§a de zero
 // 640 pixels video
 //  8 pixels left border
 //  8 pixels front porch
@@ -155,8 +147,8 @@ localparam LIMIT_MAX_LINE = (2 + 2 + 25 + 8 + RES_Y + 8);
 
 initial begin
   $display("Iniciado VGA Sync Generator!");
-  $display("LIMIT_MAX_COL: %D, Size HS: %D", LIMIT_MAX_COL, SIZE_HS);
-  $monitor("MAX_COL: %D",MAX_COL);
+  $display("LIMIT_MAX_COL: %D, Limit Max Line: %D, Size HS: %D, Size VS: %D", LIMIT_MAX_COL, LIMIT_MAX_LINE, SIZE_HS,SIZE_VS);
+  $monitor("Line: %D, HS: %D, VS: %D", LINE, HS, VS);
   //$stop();
 end
 
@@ -183,7 +175,7 @@ begin: SYNC
   local_VS <= (LINE == LIMIT_MAX_LINE);    
 end
 
-// padrão industrial do VGA usa sincronismo inverso
+// padrÃƒÂ£o industrial do VGA usa sincronismo inverso
 assign HS = ~local_HS;
 assign VS = ~local_VS;
 
