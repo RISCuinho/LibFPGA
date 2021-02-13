@@ -14,16 +14,16 @@ parameter SIZE = 8
 initial begin
 	LFSR <= seed;
 end
+//wire [SIZE - 1:0] max       = (2 ** SIZE) -1;
+//wire [SIZE - 1:0] min       = max + 1;
+//wire [SIZE - 1:0] local_tap = tap == min || tap == max ? min + 2'b10 : tap;
+wire [SIZE - 1:0] local_tap = tap == {SIZE{1'b0}} || tap == {SIZE{1'b1}} ? {{SIZE-2{1'b0}},2'b10} : tap;
 
-wire [SIZE - 1:0] max       = (2 ** SIZE) -1;
-wire [SIZE - 1:0] min       = max + 1;
-wire [SIZE - 1:0] local_tap = tap == min || tap == max ? min + 2'b10 : tap;
-
-wire feedback = LFSR[SIZE - 1] ^ (LFSR[SIZE - 2:0] == min[SIZE - 2:0]);
+wire feedback = LFSR[SIZE - 1] ^ (LFSR[SIZE - 2:0] == {SIZE{1'b0}});
 
 initial 
 begin
-	$display("LFSR SIZE %d, Min(%b), Max(%b):",SIZE, min,max);
+	$display("LFSR SIZE %d:",SIZE);
 	$display("LFSR: CLK RST SEED     LFSR     Feedback");
 end
 
