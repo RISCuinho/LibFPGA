@@ -27,8 +27,8 @@ begin
 	$display("LFSR: CLK RST SEED     LFSR     Feedback");
 end
 
-initial
-	$monitor("LFSR:  %b  %b  %d      %b     %b", clk, rst, seed, LFSR, feedback);
+//initial
+//	$monitor("LFSR:  %b  %b  %d      %b     %b", clk, rst, seed, LFSR, feedback);
 
 integer b;
 always @(posedge clk)
