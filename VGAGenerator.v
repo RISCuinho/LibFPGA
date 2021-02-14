@@ -16,7 +16,7 @@ module VGAGenerator
   output reg [DEEP_COLOR - 1: 0]G = {DEEP_COLOR{1'b0}}, 
   output reg [DEEP_COLOR - 1: 0]B = {DEEP_COLOR{1'b0}}, 
   output VS, output HS,
-  output [9:0]COL, output [8:0]LINE,
+  output [9:0]COL, output [9:0]LINE,
   output inDisplayArea
 );
 
@@ -118,14 +118,16 @@ module VGASync
 )(
   input clk, 
   output reg [9:0] COL = 10'b0, 
-  output reg [8:0] LINE = 9'b0,
+  output reg [9:0] LINE = 9'b0,
   output reg inDisplayArea = 1'b0,
   output VS,
   output HS
   );
 
 localparam SIZE_HS = 96;
-localparam LIMIT_MAX_COL =  (RES_X + 8 + SIZE_HS + 8 + 40  + 8) -1; // -1 porque a contagem comeÃƒÂ§a de zero
+localparam FRONT_COL = 8 + 8;
+localparam BACK_COL = 40 + 8;
+localparam LIMIT_COL = FRONT_COL + RES_X + SIZE_HS + BACK_COL;
 // 640 pixels video
 //  8 pixels left border
 //  8 pixels front porch
@@ -134,12 +136,14 @@ localparam LIMIT_MAX_COL =  (RES_X + 8 + SIZE_HS + 8 + 40  + 8) -1; // -1 porque
 //  8 pixels right border
 //===============================
 // 800 pixels 
-localparam SIZE_VS = 20;
-localparam LIMIT_MAX_LINE = (2 + 2 + 25 + 8 + RES_Y + 8);
+localparam SIZE_VS = 2;
+localparam FRONT_LINE = 2 + 8;
+localparam BACK_LINE = 25 + 8;
+localparam LIMIT_LINE = FRONT_LINE + RES_Y + SIZE_VS + BACK_LINE;
+//  8 lines top border
 //  2 lines front porch
 //  2 lines vertical sync
 // 25 lines back porch
-//  8 lines top border
 //480 lines video
 //  8 lines bottom border
 //---
@@ -147,12 +151,13 @@ localparam LIMIT_MAX_LINE = (2 + 2 + 25 + 8 + RES_Y + 8);
 
 initial begin
   $display("Iniciado VGA Sync Generator!");
-  $display("LIMIT_MAX_COL: %D, Limit Max Line: %D, Size HS: %D, Size VS: %D", LIMIT_MAX_COL, LIMIT_MAX_LINE, SIZE_HS,SIZE_VS);
-  $monitor("Line: %D, HS: %D, VS: %D", LINE, HS, VS);
+  $display("LIMIT_MAX_COL: %D, Limit Max Line: %D, Size HS: %D, Size VS: %D", LIMIT_COL, LIMIT_LINE, SIZE_HS, SIZE_VS);
+//  $monitor("Line: %D, HS: %D, VS: %D", LINE, HS, VS);
   //$stop();
 end
 
-wire MAX_COL = (COL == LIMIT_MAX_COL);
+wire MAX_COL  = (COL  == LIMIT_COL);
+wire MAX_LINE = (LINE == LIMIT_LINE);
 
 always @(posedge clk)
 begin: COUNT_COL
@@ -164,15 +169,17 @@ end
 
 always @(posedge clk)
 begin: COUNT_LINE
-if(MAX_COL)
-    LINE <= LINE + 1;  
+  if(MAX_COL)
+      LINE <= LINE + 1; 
+  if(MAX_LINE)
+      LINE <= 0;  
 end
 
 reg local_HS, local_VS;
 always @(posedge clk)
 begin: SYNC
-  local_HS <= (COL >= (LIMIT_MAX_COL - SIZE_HS) && COL <= LIMIT_MAX_COL); 
-  local_VS <= (LINE == LIMIT_MAX_LINE);    
+  local_HS <= (COL  > (LIMIT_COL  - SIZE_HS - FRONT_COL) && (COL  <  LIMIT_COL)); 
+  local_VS <= (LINE > (LIMIT_LINE - SIZE_VS - FRONT_LINE) && (LINE <  LIMIT_LINE));    
 end
 
 // padrÃƒÂ£o industrial do VGA usa sincronismo inverso
