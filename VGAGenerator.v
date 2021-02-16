@@ -1,10 +1,12 @@
 
 module VGAGenerator
 #(
-   parameter DEEP_COLOR = 1,
-   // resoluÃƒÂ§ÃƒÂ£o X * Y * 32bits tamanho da memÃƒÂ³ria de exibiÃƒÂ§ÃƒÂ£o
-   parameter RES_X = 640,
-   parameter RES_Y = 480
+  parameter INVERTED_SYNC   = 1,
+  parameter C_SYNC_ON_GREEN = 1,
+  parameter DEEP_COLOR      = 1,
+  // resoluÃƒÂ§ÃƒÂ£o X * Y * 32bits tamanho da memÃƒÂ³ria de exibiÃƒÂ§ÃƒÂ£o
+  parameter RES_X           = 640,
+  parameter RES_Y           = 480
 )
 (
   input clk, // tem que ser 25.175 (25mhz aproximadamente)
@@ -20,11 +22,17 @@ module VGAGenerator
   output inDisplayArea
 );
 
+wire local_HS;
+wire local_VS;
+
 // Gera os sinais de sincronismo
 VGASync #(.RES_X(RES_X), .RES_Y(RES_Y)) sync(.clk(clk), 
 													.COL(COL), .LINE(LINE), 
-													.VS(VS), .HS(HS), 
+													.VS(local_VS), .HS(local_HS), 
 													.inDisplayArea(inDisplayArea));
+
+assign HS = INVERTED_SYNC? ~local_HS : local_HS;
+assign VS = INVERTED_SYNC? ~local_VS : local_HS;
 
 // mapea o byte a sua respectiva cor, confrome a profundida de cores (DEEP_COLOR)
 always @(posedge clk)
@@ -33,7 +41,33 @@ begin: RGB_GENERATOR
 	begin
     // ainda a ser implementado
 		R <= pixel[7:0];
-		G <= pixel[15:8];
+    if(C_SYNC_ON_GREEN)
+    begin
+      // aqui ele deve fazer um xor com VS e HS (C) e G
+      // só que G pode estar dividido em diversos pinos normalmente 3
+      // com isso pode ser melhor fazer um circuito externo como o proposto no link:
+      // https://www.raphnet.net/electronique/sync-on-green/sync-on-green_en.php 
+      // link sugerido por @darklive
+      //          100 uF
+      //           ! !
+      // Green ----! !---------------------------------
+      //          -! !+                                !
+      //                                               !
+      //                                     680E      !
+      //                      BC548                    !
+      // HSync -------------      __---------/\/\------o---------  CSync on Green
+      //                     \     /!
+      //                      \   /
+      //                    ---------
+      //                        !
+      //            1k          !
+      // VSync ----/\/\----------
+        
+      G <= pixel[15:8];
+    end
+    else
+      G <= pixel[15:8];
+
 		B <= pixel[23:16];
 	end 
 end
@@ -120,14 +154,14 @@ module VGASync
   output reg [9:0] COL = 10'b0, 
   output reg [9:0] LINE = 9'b0,
   output reg inDisplayArea = 1'b0,
-  output VS,
-  output HS
+  output reg VS = 1'b0,
+  output reg HS = 1'b0
   );
 
 localparam SIZE_HS = 96;
 localparam FRONT_COL = 8 + 8;
 localparam BACK_COL = 40 + 8;
-localparam LIMIT_COL = FRONT_COL + RES_X + SIZE_HS + BACK_COL;
+localparam SIZE_COL = FRONT_COL + RES_X + SIZE_HS + BACK_COL;
 // 640 pixels video
 //  8 pixels left border
 //  8 pixels front porch
@@ -139,7 +173,7 @@ localparam LIMIT_COL = FRONT_COL + RES_X + SIZE_HS + BACK_COL;
 localparam SIZE_VS = 2;
 localparam FRONT_LINE = 2 + 8;
 localparam BACK_LINE = 25 + 8;
-localparam LIMIT_LINE = FRONT_LINE + RES_Y + SIZE_VS + BACK_LINE;
+localparam SIZE_LINE = FRONT_LINE + RES_Y + SIZE_VS + BACK_LINE;
 //  8 lines top border
 //  2 lines front porch
 //  2 lines vertical sync
@@ -150,14 +184,19 @@ localparam LIMIT_LINE = FRONT_LINE + RES_Y + SIZE_VS + BACK_LINE;
 //525 lines total per field
 
 initial begin
-  $display("Iniciado VGA Sync Generator!");
-  $display("LIMIT_MAX_COL: %D, Limit Max Line: %D, Size HS: %D, Size VS: %D", LIMIT_COL, LIMIT_LINE, SIZE_HS, SIZE_VS);
+  $display("Iniciado VGA Sync Generator! %T", $time);
+  $display("VGAGenerator Sync: LIMIT_MAX_COL: %D, Limit Max Line: %D, Size HS: %D, Size VS: %D", SIZE_COL, SIZE_LINE, SIZE_HS, SIZE_VS);
+  $display("VGAGenerator Sync: Col: Front Porch %D, Back Porch, %D", FRONT_COL, BACK_COL);
+  $display("VGAGenerator Sync: Line: Front Porch %D, Back Porch, %D", FRONT_LINE, BACK_LINE);
+  //$monitor("VGAGenerator Sync: Col: %D, Limit Front: %D, Limit Back: %D, Line: %D, Limit Front: %D, Limit Back: %D", COL, SIZE_COL  - SIZE_HS, SIZE_COL, LINE, SIZE_LINE - SIZE_VS, SIZE_LINE);
+
+//  $monitor("VGAGenerator Sync: HS: %D, VS: %D", HS, VS);
 //  $monitor("Line: %D, HS: %D, VS: %D", LINE, HS, VS);
   //$stop();
 end
 
-wire MAX_COL  = (COL  == LIMIT_COL);
-wire MAX_LINE = (LINE == LIMIT_LINE);
+wire MAX_COL  = (COL  == SIZE_COL);
+wire MAX_LINE = (LINE == SIZE_LINE);
 
 always @(posedge clk)
 begin: COUNT_COL
@@ -175,23 +214,16 @@ begin: COUNT_LINE
       LINE <= 0;  
 end
 
-reg local_HS, local_VS;
 always @(posedge clk)
 begin: SYNC
-  local_HS <= (COL  > (LIMIT_COL  - SIZE_HS - FRONT_COL) && (COL  <  LIMIT_COL)); 
-  local_VS <= (LINE > (LIMIT_LINE - SIZE_VS - FRONT_LINE) && (LINE <  LIMIT_LINE));    
+  HS <= (COL  > (SIZE_COL  - SIZE_HS)) && (COL  <  SIZE_COL); 
+  VS <= (LINE > (SIZE_LINE - SIZE_VS)) && (LINE <  SIZE_LINE);    
 end
-
-// padrÃƒÂ£o industrial do VGA usa sincronismo inverso
-assign HS = ~local_HS;
-assign VS = ~local_VS;
 
 always @(posedge clk)
 begin: DISPLAY_AREA
-if(inDisplayArea == 0)
-	inDisplayArea <= (MAX_COL) && (LINE < RES_Y);
-else
-	inDisplayArea <= !(COL == RES_X - 1);  
+	inDisplayArea <= (COL  > FRONT_COL)  && (COL  < SIZE_COL  - SIZE_HS - BACK_COL)
+                && (LINE > FRONT_LINE) && (LINE < SIZE_LINE - SIZE_VS - BACK_LINE);  
 end
 
 
