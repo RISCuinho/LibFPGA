@@ -15,7 +15,8 @@ module BinaryCounter #(
 ) (
    input                   clk, rst,
    output reg [WIDTH-1:0]  loadData, counter,
-   input                   E, D, load
+   input                   E, D, load,
+   output reg              tc, ceo
 );
 
    always @(posedge rst) begin
@@ -26,9 +27,11 @@ module BinaryCounter #(
       if(!rst && E && !load)
       begin
         counter <= D ? counter + 1 : counter - 1;
+        tc <= (D && counter == {WIDTH{1'b1}}) || (!D && counter == {WIDTH{1'b0}});
+        ceo <= tc && E;
       end
       else if(!rst && load)
          counter <= loadData;      
-      
+         
    end
 endmodule
