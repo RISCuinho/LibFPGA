@@ -35,3 +35,6 @@
 *.bck
 *.bak
 ~*
+
+# Vim Swap
+*.swp
