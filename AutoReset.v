@@ -7,13 +7,13 @@ input clr,
 output reg rst = 1'b1
 );
 
-reg [32:0] clk_count = 1'b1;
+reg [32:0] clk_count = 1'b0;
 
 
 always @(negedge clk)
 	if (clr) 
 	begin
-		clk_count <= 1'b1;
+		clk_count <= 1'b0;
 		rst <= !INVERT_RST;
 	end
 	else if (clk_count > count) rst <= INVERT_RST;
